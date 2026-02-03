@@ -49,3 +49,37 @@ df_final = (
         md5(concat_ws("|", *concat_checksum_cols(df)))
     )
 )
+
+
+# Table loading – only appending new data
+try:
+    df_final.createOrReplaceTempView("df_load")
+
+    report_load = spark.sql("""
+        SELECT
+            s.*
+        FROM df_load s
+        LEFT ANTI JOIN drvd_table.report t
+            ON t.id = s.id
+           AND t.report = s.report
+           AND t._checksum = s._checksum
+    """)
+
+    # Insert inserting new records into the table
+    report_load.write.mode("append").insertInto(
+        "drvd_table.report"
+    )
+
+    write_count_report = report_load.count()
+    status = "success"
+    message = f"{write_count_report} records inserted in report table"
+
+except Exception as write_count_exception:
+    status = "failed"
+    message = (
+        f"{write_count_exception} "
+        "Records not inserted in report table"
+    )
+
+print(message)
+
